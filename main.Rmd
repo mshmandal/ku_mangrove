@@ -1,0 +1,240 @@
+---
+title: "Mangrove calc"
+author: "Mohammad Shamim Hasan Mandal"
+date: "2022-11-12"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "hide",warning = F,message = F)
+```
+
+
+Note : 
+
+1. Open this file inside the project
+2. Then run the code chucks line by line
+
+## Required packages
+
+```{r load_pacakges}
+# install the packages; only first time
+# install.packages("geodata")
+# install.packages("terra")
+
+library(geodata) # for data
+library(terra)   # for image (raster) and vector (shpaefile)
+```
+
+
+## Directory management
+
+We will create separate folders for "data" and "results"
+
+```{r dir_create}
+dir.create("data")
+dir.create("result")
+```
+
+
+## Data download
+
+We need internet connection to download the data set for the first time.
+After downloading for next time on wards no need. 
+
+
+How to get help: we will use geodata package, it have few functions. One of them
+is gadm(), using that we can download vector (shapefile) for country(countries).
+
+```{r get_help}
+# load the help file for the gadm() function from the geodata package
+# help(gadm, geodata)
+```
+
+First, download a vector (shapefile) for Bangladesh.
+
+```{r download_shapefile}
+bd= geodata::gadm(
+  country = "Bangladesh",
+  level = 1,           # level 1 of administrative sub-division
+  path = "./data",     # save to data folder
+  version = "latest",  # version 4.1
+  resolution = 1       # high resolution
+  )
+```
+
+View the data. To see the vector that we have gave the name "bd", just type it 
+in the console. The terra package have a SpatVector class. So, the bd object
+is of SpatVector. Remember this, this is important.
+
+```{r view_data}
+# print the vector information
+bd
+
+# using head print first six rows
+head(bd)
+
+# using head get detailed information.
+str(bd)
+```
+
+
+Now make a map. Using the "bd" SpatVector, we can use plot() function to 
+make a map
+
+```{r bd_map}
+plot(bd,
+     axes=T,
+     main="Map of Bangladesh",
+     xlab="Longitude",
+     ylab="Latitude",
+     col="gray"
+     )
+```
+
+
+## Get the extent of our study area (meaning whole Bangladesh)
+
+```{r get_extent}
+# using ext() function we get the longitude(x's) and latitudes (y's):
+# xmin, xmax, ymin, ymax
+# xmin : Minimum longitude
+# xmax : Maximum longitude
+# ymin : Minimum latitude
+# ymax : Maximum latitude
+bd_ext <- terra::ext(bd)
+
+```
+
+
+
+## Get satellite image
+
+We need to download satelite image from the 
+
+```{r get_satellite_image}
+# we will use the package luna for this. First we need to download this: only first time
+# install.packages('luna', repos='https://rspatial.r-universe.dev')
+library(luna)
+
+# help document on Modis data download
+# help("getModis")
+```
+
+
+## Get modis
+
+
+List of available MODIS products
+
+```{r list_products}
+# show products that start with MOD or MYD or MCD (meaning it will show any mathcing product)
+product_list <- getProducts("^MOD|^MYD|^MCD") 
+
+
+# explore here or through Rstudio panel
+head(product_list)
+
+# you can save an csv file and view using other software package
+write.csv(product_list,file = "./data/product_list.csv",row.names = F)
+```
+
+
+
+We will download MODIS MOD09A1 Terra Surface Reflectance 8-Day Version 061
+1. Data on Google Earth Engine [MOD09A1](https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MOD09A1)
+2. [LPDAAC](https://lpdaac.usgs.gov/products/mod09a1v006/)
+
+```{r download_Modis}
+# Using getModis function we can explore the data
+list_mod09 <- getModis(
+  product = "MOD09A1",
+  start_date = "2015-01-01",
+  end_date = "2015-01-10",
+  aoi = bd_ext,
+  download = F,
+  path = tempdir()
+)
+```
+
+
+## Now check the results
+
+```{r download_modis2}
+# List of the images
+list_mod09
+
+```
+
+
+Finally to download provide Earthdata login user and password:
+If you do not have earthdata.nasa.gov user account: Please create one [EarthData](https://urs.earthdata.nasa.gov/home)
+
+```{r setup_usr_passd}
+# Using package usethis::edit_r_environ
+#usethis::edit_r_environ() # this will open the .Reviron file
+
+# write following in the file. Close the file. Restart Rstudio
+#
+# username = "Your_account"
+# password = "Your_Password"
+# 
+
+# Note: For the first time. After saveing the username and password 
+# save the file and restart R. Then start from beginning of the code.
+```
+
+
+# Download using username and password
+
+Be careful of the dates, because if your are searching for longer period there will
+be a lot of data which will take time to download. So, rather than downloading, first
+explore the data setting "download=FALSE".
+
+
+
+
+```{r dowload_modis3}
+# Create a new directory inside data:
+dir.create("./data/modis")
+
+# Now download the data inside that folder
+mod_files <- getModis(
+  product = "MOD09A1",
+  start_date = "2015-01-01",
+  end_date = "2015-01-10",
+  aoi = bd_ext,
+  download = T,  # this will download
+  path = "./data/modis",
+  username = Sys.getenv("username"),
+  password = Sys.getenv("password")
+)
+```
+
+## list the files
+
+List the files and read the first one
+```{r list_read}
+# make a list of files
+f<-list.files(path="./data/modis",full.names = T)
+
+# read
+r<-rast(f[1])
+
+
+# plot
+plot(r)
+
+```
+
+
+
+Reading:
+
+1. Where to get [data/(https://gisgeography.com/free-satellite-imagery-data-list/)
+2. See luna pakcage code in github [getModis](https://github.com/rspatial/luna/blob/master/R/getMODIS.R)
+function.
+3. Read more on [rspatial.org](https://rspatial.org/)
+
+
+
